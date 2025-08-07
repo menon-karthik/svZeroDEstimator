@@ -15,9 +15,6 @@ class Model_CoronaryResistance:
     __frozen_param_values = None
 
     # Targets
-#   targets = {}
-#   targets_values = None
-#   #targets_idxs = None # Indices for non-NaN targets
     total_target_flow = 0.0
     target_flows = None
     outlet_names = None
@@ -29,14 +26,11 @@ class Model_CoronaryResistance:
     names_corBC_r = []
     branchnames_corBC_l = []
     branchnames_corBC_r = []
-#   names_RCRBC = []
     idxs_corBC_l = []
     idxs_corBC_r = []
-#   idxs_RCRBC = []
     n_corBC_l = 0
     n_corBC_r = 0
     n_corBC = 0
-#   n_RCRBC = 0
     Ra_l_base = []
     Ram_l_base = []
     Rv_l_base = []
@@ -47,12 +41,6 @@ class Model_CoronaryResistance:
     Rv_r_base = []
     Ca_r_base = []
     Cim_r_base = []
-#   Rp_rcr_base = []
-#   C_rcr_base = []
-#   Rd_rcr_base = []
-#   Rrv_base = None
-#   Rlv_base = None
-#   Rpd_base = None
     steps_per_cycle = None
     num_cycles = None
     bc_vessel_map = {}
@@ -68,7 +56,6 @@ class Model_CoronaryResistance:
     result_weights = None
 
     # Resistance scaling
-    #self.scaled = False
     R_scaling = 0.0
     R_scaling_history = []
     # ------------------------------------------------------------
@@ -287,8 +274,8 @@ class Model_CoronaryResistance:
         return error
     
     # ------------------------------------------------------------
-
-    def update_model_params(self, params):
+    
+    def calculate_R_scaling(self, params):
         R_total_inv = 0.0
 
         # Calculate scaling
@@ -303,6 +290,12 @@ class Model_CoronaryResistance:
 
         self.R_scaling = R_total_inv / self.R_total_inv_base
         self.R_scaling_history.append(self.R_scaling)
+
+    # ------------------------------------------------------------
+
+    def update_model_params(self, params):
+
+        self.calculate_R_scaling(params)
 
         R_total_inv = 0.0
 
@@ -330,24 +323,26 @@ class Model_CoronaryResistance:
     
     # ------------------------------------------------------------
     
-    def update_json_config(self, params, r_scale):
+    def update_json_config(self, params):
 
+        self.calculate_R_scaling(params)
+        
         new_config = self.__config.copy()
         
         for i, bc_idx in enumerate(self.idxs_corBC_l):
             bc_values = new_config['boundary_conditions'][bc_idx]['bc_values'] 
-            bc_values['Ra'] = self.Ra_l_base[i]*params[i]*r_scale
-            bc_values['Ram'] = self.Ram_l_base[i]*params[i]*r_scale
-            bc_values['Rv'] = self.Rv_l_base[i]*params[i]*r_scale
+            bc_values['Ra'] = self.Ra_l_base[i]*params[i]*self.R_scaling
+            bc_values['Ram'] = self.Ram_l_base[i]*params[i]*self.R_scaling
+            bc_values['Rv'] = self.Rv_l_base[i]*params[i]*self.R_scaling
             bc_values['Ca'] = self.Ca_l_base[i]
             bc_values['Cim'] = self.Cim_l_base[i]
         
         for i, bc_idx in enumerate(self.idxs_corBC_r):
             idx = self.n_corBC_l + i
             bc_values = new_config['boundary_conditions'][bc_idx]['bc_values'] 
-            bc_values['Ra'] = self.Ra_r_base[i]*params[idx]*r_scale
-            bc_values['Ram'] = self.Ram_r_base[i]*params[idx]*r_scale
-            bc_values['Rv'] = self.Rv_r_base[i]*params[idx]*r_scale
+            bc_values['Ra'] = self.Ra_r_base[i]*params[idx]*self.R_scaling
+            bc_values['Ram'] = self.Ram_r_base[i]*params[idx]*self.R_scaling
+            bc_values['Rv'] = self.Rv_r_base[i]*params[idx]*self.R_scaling
             bc_values['Ca'] = self.Ca_r_base[i]
             bc_values['Cim'] = self.Cim_r_base[i]
        
@@ -404,14 +399,12 @@ class Model_CoronaryResistance:
     
     # ------------------------------------------------------------
     
-    def write_results_and_targets(self, results, savepath = '.'):
+    def write_results_and_targets(self, results, filename):
         
         write_data = np.array(list(zip(self.outlet_names, self.target_flow_fracs, results)), 
                               dtype=[('target_names','U16'),('target_values',float),('results',float)])
-        
-        savename = savepath + '/results_targets.dat'
 
-        np.savetxt(savename, write_data, fmt = '%-16s %-18.10e %-18.10e', header='Name, Target, Result')
+        np.savetxt(filename, write_data, fmt = '%-16s %-18.10e %-18.10e', header='Name, Target, Result')
     
     # ------------------------------------------------------------
     
@@ -434,17 +427,17 @@ class Model_CoronaryResistance:
 
 if __name__ == "__main__":
 
-    data_folder = 'from_flow_mpi/afterDistalR/' 
-    f = open(data_folder+'../afterClosedLoop/svzerod_updateconfig_closedloop.json')
+    data_folder = 'examples/coronary_resistance/'
+    f = open(data_folder+'../closed_loop/svzerod_updateconfig_closedloop.json')
     original_config = json.load(f)
     
-    model_dummy = Model_CoronaryResistance(original_config, data_folder+'target_flows.dat', data_folder+'perfusion_volumes.dat')
+    model = Model_CoronaryResistance(original_config, data_folder+'target_flows.dat', data_folder+'perfusion_volumes.dat')
     params = np.genfromtxt(data_folder+'optParams.txt')
-    model_dummy.update_model_params(params)
-    results = model_dummy.run_model()
-    model_dummy.write_results_and_targets(results)
-    r_scaling = model_dummy.get_specified_parameter("RScaling")
-    new_config = model_dummy.update_json_config(params, r_scaling)
+    model.update_model_params(params)
+    results = model.run_model()
+    model.write_results_and_targets(results, data_folder + "results_coronaryresistance.dat")
+    #r_scaling = model.get_specified_parameter("RScaling")
+    new_config = model.update_json_config(params)
     with open(data_folder+'svzerod_updateconfig_distalR.json', 'w') as f:
             json.dump(new_config, f, indent=4)
 

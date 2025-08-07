@@ -1,0 +1,29 @@
+PaoMin,Minimum Aortic Pressure,91992.18000000001
+PaoMin_conv,Minimum Aortic Pressure Convergence,0
+PaoMax, Maximum Aortic Pressure,175985.04
+PaoMax_conv,Maximum Aortic Pressure Convergence,0
+PaoMean,Mean Aortic Pressure,119989.8
+PaoMean_conv,Mean Aortic Pressure Convergence,0
+AorCorSplit,Coronary Flow Split,2.3034097338803723
+AbsQin,Stroke Volume,66.3
+AbsQin_conv,Inlet flow rate convergence,0
+Qsystole_perc,Percentage of cardiac output in systole,0.9
+PpulMean,Mean Pulmonary Pressure,18665.08
+EFLV,Left Ventricular Ejection Fraction,0.68
+ESV,End Systolic Volume,31.19999999999999
+EDV,End Diastolic Voume,97.49999999999999
+QlaRatio,Left atrioventricular early/late flow ratio,none
+mitValveTime,Mitral Valve Opening Time,none
+aorValveTime,Aortic Valvee Opening Time,none
+pulValveTime,Pulmonary Valve Opening Time,none
+PraMean,Mean Right Atrial Pressure,none
+LCorMaxRatio,Diastolic/Systolic maximum flow ratio in left coronary,2.4
+LCorTotRatio,Diastolic/Systolic total flow ratio in left coronary,4.667
+LThirdFF,Left coronary 1/3 flow fraction,0.46
+LHalfFF,Left coronary 1/2 flow fraction,0.67
+LGradOK,Checking amount of peaks/valleys in left coronary wave,5.0
+RCorMaxRatio,Diastolic/Systolic maximum flow ratio in right coronary,1.4
+RCorTotRatio,Diastolic/Systolic total flow ratio in right coronary,1.2857
+RThirdFF,Right coronary 1/3 flow fraction,0.39
+RHalfFF,Right coronary 1/2 flow fraction,0.57
+RGradOK,Checking amount of peaks/valleys in right coronary wave,5.0

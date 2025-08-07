@@ -50,6 +50,7 @@ class Model_ClosedLoop:
     steps_per_cycle = None
     num_cycles = None
     bc_vessel_map = {}
+    heart_outlet_block = []
     # ------------------------------------------------------------
     
     def __init__(self, config, data = None):
@@ -124,10 +125,10 @@ class Model_ClosedLoop:
             if "boundary_conditions" in vessel:
                 if "outlet" in vessel["boundary_conditions"]:
                     self.bc_vessel_map[vessel["boundary_conditions"]["outlet"]] = vessel["vessel_name"]
-        
-        weights = self.get_result_weights()[self.targets_idxs]
-        std = self.get_result_std()[self.targets_idxs]
-        self.results_scale = np.multiply(np.square(std), weights)
+
+        if len(config["closed_loop_blocks"][0]["outlet_blocks"]) > 1:
+            raise RuntimeError("Multiple heart outlet blocks not implemented.")
+        self.heart_outlet_block = config["closed_loop_blocks"][0]["outlet_blocks"][0]
 
     # ------------------------------------------------------------
 
@@ -272,8 +273,7 @@ class Model_ClosedLoop:
     # ------------------------------------------------------------
 
     def weighted_mse_error(self, results):
-        scale = self.results_scale[self.targets_idxs]
-        error = np.mean(np.divide(np.square((self.targets_values - results)[self.targets_idxs]), scale))
+        error = np.mean(np.divide(np.square((self.targets_values - results)[self.targets_idxs]), self.results_scale))
         print("Error = ", error)
         return error
     
@@ -757,7 +757,7 @@ class Model_ClosedLoop:
             l_half_FF = 0.0
 
         # Compute quantities
-        q_aorta = self.__solver.get_single_result("flow:J_heart_outlet:aorta")
+        q_aorta = self.__solver.get_single_result("flow:J_heart_outlet:"+self.heart_outlet_block)
 #       plt.figure()
 #       plt.plot(times,q_aorta)
 #       plt.savefig("q_aorta.pdf")
@@ -766,7 +766,7 @@ class Model_ClosedLoop:
         Qsystole = np.trapezoid(q_aorta[systole_start:systole_end], x=times[systole_start:systole_end])
         systole_perc = Qsystole/Qinlet;
         Aor_Cor_split = ( (Q_lcor + Q_rcor) / (Q_lcor + Q_rcor + Q_rcr) ) * 100.0
-        p_aorta = self.__solver.get_single_result("pressure:J_heart_outlet:aorta")
+        p_aorta = self.__solver.get_single_result("pressure:J_heart_outlet:"+self.heart_outlet_block)
 #       plt.figure()
 #       plt.plot(times,p_aorta)
 #       plt.savefig("p_aorta.pdf")
@@ -865,17 +865,19 @@ class Model_ClosedLoop:
         self.targets = dict(zip(target_names, target_values))
         self.targets_values = target_values
         self.targets_idxs = np.where(~np.isnan(self.targets_values))[0]
+        
+        weights = self.get_result_weights()[self.targets_idxs]
+        std = self.get_result_std()[self.targets_idxs]
+        self.results_scale = np.multiply(np.square(std), weights)
     
     # ------------------------------------------------------------
     
-    def write_results_and_targets(self, results, savepath = '.'):
+    def write_results_and_targets(self, results, filename):
         
         write_data = np.array(list(zip(self.targets.keys(), self.targets.values(), results)), 
                               dtype=[('target_names','U16'),('target_values',float),('results',float)])
-        
-        savename = savepath + '/results_targets.dat'
 
-        np.savetxt(savename, write_data, fmt = '%-16s %-18.10e %-18.10e', header='Name, Target, Result')
+        np.savetxt(filename, write_data, fmt = '%-16s %-18.10e %-18.10e', header='Name, Target, Result')
     
     # ------------------------------------------------------------
    
@@ -904,19 +906,16 @@ class Model_ClosedLoop:
 
 if __name__ == "__main__":
 
-    data_folder = 'from_flow_mpi/afterClosedLoop/' 
-    #f = open(data_folder+'svzerod_tuning.json')
+    data_folder = 'examples/closed_loop/' 
     f = open(data_folder+'svzerod_tuning_cgs.json')
     original_config = json.load(f)
     
-    model_dummy = Model_ClosedLoop(original_config)
-    #model_dummy.read_targets_csv(data_folder+'coronary.csv')
-    model_dummy.read_targets_csv(data_folder+'coronary_cgs.csv')
+    model = Model_ClosedLoop(original_config)
+    model.read_targets_csv(data_folder+'coronary_cgs.csv')
     params = np.genfromtxt(data_folder+'optParams.txt')
-    model_dummy.update_model_params(params)
-    results = model_dummy.run_model()
-    model_dummy.write_results_and_targets(results)
-    new_config = model_dummy.update_config_params(params)
-    #with open(data_folder+'svzerod_updateconfig_closedloop.json', 'w') as f:
-    with open(data_folder+'svzerod_updateconfig_closedloop_testcgs.json', 'w') as f:
+    model.update_model_params(params)
+    results = model.run_model()
+    model.write_results_and_targets(results, data_folder + "results_closedloop.dat")
+    new_config = model.update_config_params(params)
+    with open(data_folder+'svzerod_updateconfig_closedloop.json', 'w') as f:
             json.dump(new_config, f, indent=4)
